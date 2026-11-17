@@ -1,7 +1,9 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.logging_config import logger
@@ -20,6 +22,11 @@ from app.api.routes import (
 )
 
 os.makedirs("logs", exist_ok=True)
+
+# Path to built frontend
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist")
+INDEX_HTML_PATH = os.path.join(FRONTEND_DIST, "index.html")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -57,11 +64,54 @@ app.include_router(execution.router, prefix="/api", tags=["Isolated Execution"])
 app.include_router(debugging.router, prefix="/api", tags=["Automated Debugging"])
 app.include_router(governance.router, prefix="/api", tags=["Governance & Metrics"])
 
+# Mount static assets if frontend/dist exists
+if os.path.exists(os.path.join(FRONTEND_DIST, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+
+@app.get("/api")
+@app.get("/api/")
+async def api_root():
+    return {
+        "status": "online",
+        "version": "1.0.0",
+        "docs_url": "/docs",
+        "endpoints": {
+            "health": "/api/health",
+            "models": "/api/models",
+            "projects": "/api/projects",
+            "history": "/api/history",
+            "stats": "/api/stats",
+            "workflow": "/api/workflow/start"
+        }
+    }
+
 @app.get("/")
-async def root():
+async def root(request: Request):
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and os.path.exists(INDEX_HTML_PATH):
+        return FileResponse(INDEX_HTML_PATH)
     return {
         "framework": "Agentic AI Autonomous Software Engineering Framework",
         "version": "1.0.0",
         "docs_url": "/docs",
         "health_check": "/api/health"
     }
+
+@app.get("/{full_path:path}")
+async def serve_spa_or_static(full_path: str, request: Request):
+    """Serve SPA routes and static root assets, preventing 404 on browser navigation."""
+    if full_path.startswith("api/") or full_path == "api":
+        return JSONResponse(status_code=404, content={"detail": f"API endpoint '/{full_path}' not found"})
+    if full_path.startswith("docs") or full_path.startswith("redoc") or full_path.startswith("openapi.json"):
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+
+    # Check if a static file directly in frontend/dist exists (e.g. favicon.svg)
+    candidate_file = os.path.join(FRONTEND_DIST, full_path)
+    if os.path.isfile(candidate_file):
+        return FileResponse(candidate_file)
+
+    # Return index.html for SPA client-side routing
+    if os.path.exists(INDEX_HTML_PATH):
+        return FileResponse(INDEX_HTML_PATH)
+
+    return JSONResponse(status_code=404, content={"detail": f"Path '/{full_path}' not found"})

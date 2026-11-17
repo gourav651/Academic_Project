@@ -15,7 +15,8 @@ from app.database.models import (
     TestResult,
     DebuggingHistory,
     AuditLog,
-    CodeVersion
+    CodeVersion,
+    GeneratedCode
 )
 from app.graph.state import WorkflowState
 from app.graph.workflow import autonomous_graph
@@ -191,30 +192,109 @@ async def _execute_workflow_task(task_id: str, initial_state: WorkflowState, run
 
 
 @router.get("/workflow/{task_id}")
-async def get_workflow_status(task_id: str):
-    """Retrieve current state and output snapshots for a task."""
+async def get_workflow_status(task_id: str, db: AsyncSession = Depends(get_db)):
+    """Retrieve current state and output snapshots for a task with DB persistence fallback."""
     workflow = active_workflows.get(task_id)
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Task not found or cache expired")
+    if workflow:
+        state = workflow.get("state", {})
+        return {
+            "task_id": task_id,
+            "status": workflow.get("status"),
+            "workflow_status": state.get("workflow_status"),
+            "user_requirement": state.get("user_requirement"),
+            "agent_statuses": state.get("agent_statuses", {}),
+            "generated_code": state.get("corrected_code") or state.get("generated_code"),
+            "implementation_plan": state.get("implementation_plan"),
+            "review_results": state.get("review_results"),
+            "test_code": state.get("test_code"),
+            "test_results": state.get("test_results"),
+            "execution_results": state.get("execution_results"),
+            "explanation": state.get("explanation"),
+            "debugging_attempts": state.get("debugging_attempts", 0),
+            "debugging_history": state.get("debugging_history", []),
+            "execution_logs": state.get("execution_logs", []),
+            "error_details": state.get("error_details")
+        }
 
-    state = workflow.get("state", {})
+    # Fallback: Query SQLite database if memory cache is not present
+    res = await db.execute(select(WorkflowRun).where((WorkflowRun.task_id == task_id) | (WorkflowRun.id == task_id)))
+    run = res.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Fetch agent execution statuses
+    agent_execs_res = await db.execute(
+        select(AgentExecution).where(AgentExecution.workflow_run_id == run.id)
+    )
+    agent_execs = agent_execs_res.scalars().all()
+    agent_statuses = {}
+    for ae in agent_execs:
+        agent_statuses[ae.agent_name] = {
+            "name": ae.agent_name,
+            "status": ae.status,
+            "output_summary": ae.output_summary or "",
+            "error": ae.error_info or "",
+            "duration": ae.duration_seconds
+        }
+
+    # Fetch generated code
+    code_text = ""
+    if run.project_id:
+        code_res = await db.execute(
+            select(GeneratedCode).where(GeneratedCode.project_id == run.project_id).order_by(GeneratedCode.created_at.desc())
+        )
+        code_obj = code_res.scalars().first()
+        if code_obj:
+            code_text = code_obj.source_code
+    if not code_text:
+        code_res = await db.execute(
+            select(GeneratedCode).order_by(GeneratedCode.created_at.desc())
+        )
+        code_obj = code_res.scalars().first()
+        if code_obj:
+            code_text = code_obj.source_code
+
+    # Fetch test result
+    test_res = await db.execute(
+        select(TestResult).where(TestResult.workflow_run_id == run.id).order_by(TestResult.created_at.desc())
+    )
+    test_obj = test_res.scalars().first()
+    test_data = {
+        "success": (test_obj.failed_tests == 0 and test_obj.total_tests > 0),
+        "total_tests": test_obj.total_tests,
+        "passed_tests": test_obj.passed_tests,
+        "failed_tests": test_obj.failed_tests,
+        "test_output": test_obj.test_output
+    } if test_obj else None
+
+    # Fetch audit logs for execution log display
+    audit_res = await db.execute(
+        select(AuditLog).where(AuditLog.workflow_run_id == run.id).order_by(AuditLog.timestamp.asc())
+    )
+    logs = [
+        f"[{l.timestamp.isoformat()}] [{l.agent_name.upper()}] {l.action} ({l.status})"
+        for l in audit_res.scalars().all()
+    ]
+    if not logs:
+        logs = [f"Workflow completed for Task {task_id}"]
+
     return {
         "task_id": task_id,
-        "status": workflow.get("status"),
-        "workflow_status": state.get("workflow_status"),
-        "user_requirement": state.get("user_requirement"),
-        "agent_statuses": state.get("agent_statuses", {}),
-        "generated_code": state.get("corrected_code") or state.get("generated_code"),
-        "implementation_plan": state.get("implementation_plan"),
-        "review_results": state.get("review_results"),
-        "test_code": state.get("test_code"),
-        "test_results": state.get("test_results"),
-        "execution_results": state.get("execution_results"),
-        "explanation": state.get("explanation"),
-        "debugging_attempts": state.get("debugging_attempts", 0),
-        "debugging_history": state.get("debugging_history", []),
-        "execution_logs": state.get("execution_logs", []),
-        "error_details": state.get("error_details")
+        "status": run.workflow_status,
+        "workflow_status": run.workflow_status,
+        "user_requirement": run.user_requirement,
+        "agent_statuses": agent_statuses,
+        "generated_code": code_text,
+        "implementation_plan": None,
+        "review_results": None,
+        "test_code": test_obj.test_code if test_obj else None,
+        "test_results": test_data,
+        "execution_results": None,
+        "explanation": None,
+        "debugging_attempts": 0,
+        "debugging_history": [],
+        "execution_logs": logs,
+        "error_details": run.error_message
     }
 
 
@@ -229,7 +309,15 @@ async def stream_workflow_events(task_id: str):
         while iterations < max_iterations:
             workflow = active_workflows.get(task_id)
             if not workflow:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'Workflow not found'})}\n\n"
+                # Check if it was already completed in DB
+                async with AsyncSessionLocal() as db:
+                    res = await db.execute(select(WorkflowRun).where((WorkflowRun.task_id == task_id) | (WorkflowRun.id == task_id)))
+                    run = res.scalar_one_or_none()
+                    if run:
+                        yield f"data: {json.dumps({'type': 'status', 'workflow_status': run.workflow_status, 'agent_statuses': {}})}\n\n"
+                        yield f"data: {json.dumps({'type': 'done', 'final_status': run.workflow_status})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'type': 'error', 'message': 'Workflow not found'})}\n\n"
                 break
 
             state = workflow.get("state", {})

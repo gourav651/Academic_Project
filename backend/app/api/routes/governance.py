@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get("/governance/{task_id}")
 async def get_governance_audit(task_id: str, db: AsyncSession = Depends(get_db)):
     """Retrieve full decision traceability, audit logs, and approval records for a task."""
-    run_res = await db.execute(select(WorkflowRun).where(WorkflowRun.task_id == task_id))
+    run_res = await db.execute(select(WorkflowRun).where((WorkflowRun.task_id == task_id) | (WorkflowRun.id == task_id)))
     run = run_res.scalar_one_or_none()
     if not run:
         raise HTTPException(status_code=404, detail="Workflow task not found")
@@ -76,7 +76,7 @@ async def get_governance_audit(task_id: str, db: AsyncSession = Depends(get_db))
 @router.post("/approvals/{task_id}")
 async def submit_approval_decision(task_id: str, req: ApprovalRequest, db: AsyncSession = Depends(get_db)):
     """Human-in-the-loop checkpoint: approve or reject proposed modifications."""
-    run_res = await db.execute(select(WorkflowRun).where(WorkflowRun.task_id == task_id))
+    run_res = await db.execute(select(WorkflowRun).where((WorkflowRun.task_id == task_id) | (WorkflowRun.id == task_id)))
     run = run_res.scalar_one_or_none()
     if not run:
         raise HTTPException(status_code=404, detail="Workflow task not found")
