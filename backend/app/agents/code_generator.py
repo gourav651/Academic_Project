@@ -22,7 +22,8 @@ You must ALWAYS respond with ONLY a valid JSON object matching this schema:
   "implementation_summary": "Summary of what was implemented",
   "functions_implemented": ["function_name_1", "function_name_2"]
 }
-Do NOT include markdown backticks or text outside the JSON."""
+
+IMPORTANT: In the "source_code" field, provide ONLY the Python code. Do NOT wrap the JSON response in markdown code blocks."""
 
 class CodeGeneratorAgent:
     def __init__(self, ollama_service: OllamaService):
@@ -66,18 +67,56 @@ Respond with strictly valid JSON matching the schema."""
             }
 
     def _parse_json(self, text: str) -> Dict[str, Any]:
-        match = re.search(r'\{[\s\S]*\}', text)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
+        cleaned = text.strip()
+        # 1. Strip markdown fences if wrapping the JSON
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```$", "", cleaned)
 
-        # Fallback to extracting code blocks if LLM returned markdown
-        code_match = re.search(r'```python\n([\s\S]*?)\n```', text)
-        code = code_match.group(1) if code_match else text
+        # 2. Try standard json.loads
+        try:
+            data = json.loads(cleaned)
+            code = data.get("source_code", "")
+            code = re.sub(r"^```[a-zA-Z]*\n?", "", code.strip())
+            code = re.sub(r"\n?```$", "", code.strip())
+            return {
+                "filename": data.get("filename", "solution.py"),
+                "source_code": code,
+                "dependencies": data.get("dependencies", []),
+                "implementation_summary": data.get("implementation_summary", ""),
+                "functions_implemented": data.get("functions_implemented", [])
+            }
+        except Exception:
+            pass
+
+        # 3. Robust Regex Extraction
+        # Extract filename
+        fn_match = re.search(r'["\']filename["\']\s*:\s*["\']([^"\']+)["\']', text)
+        filename = fn_match.group(1) if fn_match else "solution.py"
+
+        # Extract source_code when model outputs raw triple quotes
+        code_match = re.search(r'["\']source_code["\']\s*:\s*(?:"""|\'\'\'|")([\s\S]*?)(?:"""|\'\'\'|")\s*,\s*["\']', text)
+        if code_match:
+            code = code_match.group(1).strip()
+        else:
+            py_block = re.search(r'```(?:python|py)\n([\s\S]*?)\n```', text)
+            if py_block:
+                code = py_block.group(1).strip()
+            else:
+                code_start = re.search(r'(?:def\s+|class\s+|import\s+|from\s+)', text)
+                if code_start:
+                    raw_code = text[code_start.start():]
+                    raw_code = re.split(r'(?:"""|\'\'\'|")\s*,\s*["\'](?:dependencies|implementation_summary|functions_implemented)', raw_code)[0]
+                    code = raw_code.strip()
+                else:
+                    code = text.strip()
+
+        # Clean any accidental outer markdown fences
+        code = re.sub(r"^```[a-zA-Z]*\n?", "", code.strip())
+        code = re.sub(r"\n?```$", "", code.strip())
+
         return {
-            "filename": "solution.py",
+            "filename": filename,
             "source_code": code,
             "dependencies": [],
             "implementation_summary": "Extracted from generator output",

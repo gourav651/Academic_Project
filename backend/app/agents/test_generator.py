@@ -73,15 +73,39 @@ Respond with strictly valid JSON matching the schema."""
             }
 
     def _parse_json(self, text: str) -> Dict[str, Any]:
-        match = re.search(r'\{[\s\S]*\}', text)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```$", "", cleaned)
 
-        code_match = re.search(r'```python\n([\s\S]*?)\n```', text)
-        code = code_match.group(1) if code_match else "# Test suite extraction failed"
+        try:
+            data = json.loads(cleaned)
+            code = data.get("test_code", "")
+            code = re.sub(r"^```[a-zA-Z]*\n?", "", code.strip())
+            code = re.sub(r"\n?```$", "", code.strip())
+            data["test_code"] = code
+            return data
+        except Exception:
+            pass
+
+        # Regex fallback for triple-quoted test_code
+        code_match = re.search(r'["\']test_code["\']\s*:\s*(?:"""|\'\'\'|")([\s\S]*?)(?:"""|\'\'\'|")\s*,\s*["\']', text)
+        if code_match:
+            code = code_match.group(1).strip()
+        else:
+            py_match = re.search(r'```(?:python|py)\n([\s\S]*?)\n```', text)
+            if py_match:
+                code = py_match.group(1).strip()
+            else:
+                code_start = re.search(r'(?:def\s+test_|import\s+pytest|from\s+solution)', text)
+                if code_start:
+                    code = text[code_start.start():].strip()
+                else:
+                    code = text.strip()
+
+        code = re.sub(r"^```[a-zA-Z]*\n?", "", code.strip())
+        code = re.sub(r"\n?```$", "", code.strip())
+
         return {
             "test_code": code,
             "test_cases": [],

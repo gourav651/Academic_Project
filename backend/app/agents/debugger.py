@@ -108,15 +108,39 @@ Identify the root cause and provide the FULL corrected code. Respond with strict
             }
 
     def _parse_json(self, text: str) -> Dict[str, Any]:
-        match = re.search(r'\{[\s\S]*\}', text)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```$", "", cleaned)
 
-        code_match = re.search(r'```python\n([\s\S]*?)\n```', text)
-        code = code_match.group(1) if code_match else ""
+        try:
+            data = json.loads(cleaned)
+            code = data.get("corrected_code", "")
+            code = re.sub(r"^```[a-zA-Z]*\n?", "", code.strip())
+            code = re.sub(r"\n?```$", "", code.strip())
+            data["corrected_code"] = code
+            return data
+        except Exception:
+            pass
+
+        # Regex fallback for triple-quoted corrected_code
+        code_match = re.search(r'["\']corrected_code["\']\s*:\s*(?:"""|\'\'\'|")([\s\S]*?)(?:"""|\'\'\'|")\s*,\s*["\']', text)
+        if code_match:
+            code = code_match.group(1).strip()
+        else:
+            py_match = re.search(r'```(?:python|py)\n([\s\S]*?)\n```', text)
+            if py_match:
+                code = py_match.group(1).strip()
+            else:
+                code_start = re.search(r'(?:def\s+|class\s+|import\s+|from\s+)', text)
+                if code_start:
+                    code = text[code_start.start():].strip()
+                else:
+                    code = text.strip()
+
+        code = re.sub(r"^```[a-zA-Z]*\n?", "", code.strip())
+        code = re.sub(r"\n?```$", "", code.strip())
+
         return {
             "root_cause": "Extracted from debugger output",
             "error_category": "runtime",

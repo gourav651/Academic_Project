@@ -63,7 +63,11 @@ Respond with strictly valid JSON matching the schema."""
             }
 
     def _parse_json(self, text: str) -> Dict[str, Any]:
-        match = re.search(r'\{[\s\S]*\}', text)
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```$", "", cleaned)
+        match = re.search(r'\{[\s\S]*\}', cleaned)
         if match:
             try:
                 return json.loads(match.group())
