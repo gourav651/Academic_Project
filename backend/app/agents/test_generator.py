@@ -97,9 +97,11 @@ Respond with strictly valid JSON matching the schema."""
             if py_match:
                 code = py_match.group(1).strip()
             else:
-                code_start = re.search(r'(?:def\s+test_|import\s+pytest|from\s+solution)', text)
+                code_start = re.search(r'(?:def\s+test_|import\s+|from\s+)', text)
                 if code_start:
-                    code = text[code_start.start():].strip()
+                    raw_code = text[code_start.start():]
+                    raw_code = re.split(r'(?:"""|\'\'\'|")\s*,\s*["\'](?:test_cases|coverage_areas|test_strategy)', raw_code)[0]
+                    code = raw_code.strip()
                 else:
                     code = text.strip()
 

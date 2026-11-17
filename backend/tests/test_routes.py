@@ -1,9 +1,11 @@
 import asyncio
 from httpx import AsyncClient, ASGITransport
 from app.main import app
+from app.database.init_db import init_db
 
 def test_api_routes():
     async def _run():
+        await init_db()
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             # 1. Health
             res = await client.get("/api/health")

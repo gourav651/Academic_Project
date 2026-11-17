@@ -8,21 +8,60 @@ from typing import Dict, Any
 from app.core.logging_config import logger
 
 class TestingService:
-    async def run_tests(self, test_code: str, source_code: str) -> Dict[str, Any]:
+    async def run_tests(self, test_code: str, source_code: str, filename: str = "solution.py") -> Dict[str, Any]:
         """Run pytest on generated unit tests against the source code in a sandbox directory."""
         tmp_dir = tempfile.mkdtemp(prefix="agentic_pytest_")
         try:
-            # Write solution code
+            # Clean fences if any
+            clean_source = source_code.strip()
+            if clean_source.startswith("```"):
+                clean_source = re.sub(r"^```[a-zA-Z]*\n?", "", clean_source)
+                clean_source = re.sub(r"\n?```$", "", clean_source).strip()
+
+            clean_test = test_code.strip()
+            if clean_test.startswith("```"):
+                clean_test = re.sub(r"^```[a-zA-Z]*\n?", "", clean_test)
+                clean_test = re.sub(r"\n?```$", "", clean_test).strip()
+
+            # 1. Write solution.py
             with open(os.path.join(tmp_dir, "solution.py"), 'w', encoding='utf-8') as f:
-                f.write(source_code)
+                f.write(clean_source)
 
-            # Write test code
+            # 2. If custom filename is given and not solution.py, also write it
+            if filename and filename != "solution.py":
+                base_name = os.path.basename(filename)
+                with open(os.path.join(tmp_dir, base_name), 'w', encoding='utf-8') as f:
+                    f.write(clean_source)
+
+            # 3. Detect any imported modules in test_code like:
+            # from xyz import ... or import xyz
+            imported_mods = set(re.findall(r'(?:from|import)\s+([a-zA-Z_][a-zA-Z0-9_]*)', clean_test))
+            standard_mods = {
+                'sys', 'os', 'pytest', 'unittest', 'math', 're', 'json', 'time', 'datetime', 
+                'typing', 'collections', 'itertools', 'functools', 'random', 'string', 'pathlib',
+                'copy', 'abc', 'enum', 'io', 'tempfile', 'shutil', 'subprocess', 'inspect',
+                'decimal', 'fractions', 'statistics', 'dataclasses'
+            }
+            for mod in imported_mods:
+                if mod not in standard_mods and not (mod.startswith('__') or mod == 'solution'):
+                    mod_file = os.path.join(tmp_dir, f"{mod}.py")
+                    if not os.path.exists(mod_file):
+                        with open(mod_file, 'w', encoding='utf-8') as f:
+                            f.write(clean_source)
+
+            # 4. Write test code
             with open(os.path.join(tmp_dir, "test_solution.py"), 'w', encoding='utf-8') as f:
-                f.write(test_code)
+                f.write(clean_test)
 
-            # Configure sys.path via conftest
+            # 5. Configure sys.path via conftest
+            conftest_content = (
+                "import sys, os\n"
+                "dir_path = os.path.dirname(__file__)\n"
+                "if dir_path not in sys.path:\n"
+                "    sys.path.insert(0, dir_path)\n"
+            )
             with open(os.path.join(tmp_dir, "conftest.py"), 'w', encoding='utf-8') as f:
-                f.write("import sys, os\nsys.path.insert(0, os.path.dirname(__file__))\n")
+                f.write(conftest_content)
 
             # Run pytest using current Python executable
             result = subprocess.run(

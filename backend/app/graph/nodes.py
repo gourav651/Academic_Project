@@ -165,7 +165,8 @@ async def test_generator_node(state: WorkflowState) -> WorkflowState:
         test_run = None
         if test_code:
             logs.append(f"[{_timestamp()}] [TEST_GENERATOR] Running pytest validation...")
-            test_run = await testing_service.run_tests(test_code, code)
+            filename = state.get("code_filename") or "solution.py"
+            test_run = await testing_service.run_tests(test_code, code, filename=filename)
             summary += f" | {test_run.get('passed_tests', 0)} passed, {test_run.get('failed_tests', 0)} failed"
         
         statuses = _update_status({**state, "agent_statuses": statuses}, "test_generator", "completed", summary, duration=dur)

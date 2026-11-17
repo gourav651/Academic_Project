@@ -4,13 +4,16 @@ from typing import List, Union
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DEFAULT_DB_PATH = os.path.join(BASE_DIR, "agentic_framework.db").replace("\\", "/")
+
 class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5-coder:1.5b"
     ollama_timeout: int = 120
     max_debug_attempts: int = 3
     execution_timeout: int = 30
-    database_url: str = "sqlite+aiosqlite:///./agentic_framework.db"
+    database_url: str = f"sqlite+aiosqlite:///{DEFAULT_DB_PATH}"
     secret_key: str = "dev-secret-key-change-in-production"
     cors_origins: Union[List[str], str] = ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"]
 

@@ -134,7 +134,9 @@ Identify the root cause and provide the FULL corrected code. Respond with strict
             else:
                 code_start = re.search(r'(?:def\s+|class\s+|import\s+|from\s+)', text)
                 if code_start:
-                    code = text[code_start.start():].strip()
+                    raw_code = text[code_start.start():]
+                    raw_code = re.split(r'(?:"""|\'\'\'|")\s*,\s*["\'](?:error_analysis|root_cause|fix_description|confidence)', raw_code)[0]
+                    code = raw_code.strip()
                 else:
                     code = text.strip()
 
