@@ -20,10 +20,11 @@ import {
 } from 'lucide-react';
 
 const examplePrompts = [
-  'Implement a thread-safe LRU Cache with capacity limit, get() and put() methods.',
-  'Write a Python function to validate credit card numbers using the Luhn algorithm.',
-  'Implement a Binary Search Tree with insert, search, delete, and in-order traversal.',
-  'Create a rate-limiting token bucket algorithm with configurable refill rate.'
+  'Write a Python function to calculate the sum of two numbers.',
+  'Write a Python function to check whether a given number is prime or not.',
+  'Implement Merge Sort algorithm in Python to sort a list of numbers.',
+  'Write a Python function to find the factorial of a given number.',
+  'Write a Python function to check whether a string is a palindrome.'
 ];
 
 export default function Generator() {
@@ -84,7 +85,7 @@ export default function Generator() {
           rows={4}
           value={requirement}
           onChange={(e) => setRequirement(e.target.value)}
-          placeholder="E.g., Write a thread-safe LRU Cache in Python with get and put methods, handling capacity eviction..."
+          placeholder="E.g., Write a Python function to check whether a given number is prime or not..."
           className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg p-3 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition font-sans"
         />
 
