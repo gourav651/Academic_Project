@@ -178,7 +178,7 @@ export default function WorkflowView() {
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
               <Network className="w-5 h-5 text-indigo-400" />
-              <span>Multi-Agent Orchestration Flow</span>
+              <span>Multi-Agent Execution Pipeline</span>
             </h1>
             <span
               className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
