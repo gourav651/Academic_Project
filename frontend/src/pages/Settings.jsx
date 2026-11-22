@@ -114,7 +114,7 @@ export default function Settings() {
           </div>
 
           {/* Hardware & Model Recommendations Guide */}
-          <div className="p-4 bg-[#0d1117] rounded-xl border border-[#30363d] space-y-2 text-xs">
+          {/* <div className="p-4 bg-[#0d1117] rounded-xl border border-[#30363d] space-y-2 text-xs">
             <span className="font-semibold text-gray-200 block flex items-center gap-1.5">
               <HardDrive className="w-4 h-4 text-indigo-400" />
               <span>Recommended Models for Your System (8GB RAM / 4GB GPU VRAM)</span>
@@ -136,7 +136,7 @@ export default function Settings() {
                 <p className="text-[10px] text-gray-500">Chain-of-thought code reasoning capability.</p>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Section 2: Safe Execution & Docker Isolation */}

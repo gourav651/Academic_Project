@@ -1,0 +1,49 @@
+# Python byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Virtual environments
+venv/
+.venv/
+backend/venv/
+env/
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+agentic_framework.db
+backend/agentic_framework.db
+
+# Testing and linters
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs
+logs/
+backend/logs/
+*.log
+
+# Node & Frontend dependencies and build
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -40,7 +40,7 @@ export default function Navbar() {
         </div>
 
         {/* Ollama status badge */}
-        <div
+        {/* <div
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${
             health.ollama_connected
               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
@@ -50,7 +50,7 @@ export default function Navbar() {
         >
           <Server className="w-3 h-3" />
           <span>{health.ollama_connected ? 'Ollama Online' : 'Ollama Offline'}</span>
-        </div>
+        </div> */}
 
         {/* Docker sandbox badge */}
         <div
