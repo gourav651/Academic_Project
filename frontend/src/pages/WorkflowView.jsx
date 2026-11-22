@@ -32,6 +32,32 @@ const agentOrder = [
   { key: 'explainer', name: 'Code Explainer', desc: 'Algorithmic breakdown & explainability' }
 ];
 
+// Helper to sanitize any raw JSON strings or markdown fences
+const cleanDisplayText = (val) => {
+  if (!val) return '';
+  if (typeof val !== 'string') return String(val);
+  let cleaned = val.trim();
+  // Strip markdown code fences
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
+  }
+  // If text is JSON string, parse or extract field
+  if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+    try {
+      const obj = JSON.parse(cleaned);
+      if (obj.problem_understanding) return obj.problem_understanding;
+      if (obj.overview) return obj.overview;
+      if (obj.description) return obj.description;
+      if (obj.details) return obj.details;
+    } catch {}
+  }
+  // Remove raw JSON field prefixes like ```json { "problem_understanding": " or { "overview": "
+  cleaned = cleaned.replace(/^[{\s]*"(?:problem_understanding|overview|details|description)"\s*:\s*"/i, '');
+  cleaned = cleaned.replace(/",\s*"[a-zA-Z0-9_]+"\s*:[\s\S]*$/, '');
+  cleaned = cleaned.replace(/["}\]]+$/, '').trim();
+  return cleaned;
+};
+
 export default function WorkflowView() {
   const location = useLocation();
   const { currentTaskId, setCurrentTaskId } = useApp();
@@ -401,26 +427,49 @@ export default function WorkflowView() {
           <div className="p-6 space-y-4 text-xs">
             {workflow?.implementation_plan ? (
               <>
-                <div className="p-3 bg-[#21262d] rounded-lg border border-[#30363d]">
-                  <span className="font-semibold text-gray-200 block mb-1">Problem Understanding:</span>
-                  <p className="text-gray-400">
-                    {workflow.implementation_plan.problem_understanding}
+                <div className="p-4 bg-[#21262d] rounded-lg border border-[#30363d] space-y-1">
+                  <span className="font-semibold text-indigo-400 block text-xs uppercase tracking-wider">
+                    Problem Understanding
+                  </span>
+                  <p className="text-gray-300 leading-relaxed text-xs">
+                    {cleanDisplayText(workflow.implementation_plan.problem_understanding)}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <span className="font-semibold text-gray-200 block">Decomposed Steps:</span>
+                  <span className="font-semibold text-gray-400 block text-xs uppercase tracking-wider">
+                    Step-by-Step Implementation Steps
+                  </span>
                   <div className="space-y-2">
-                    {workflow.implementation_plan.implementation_plan?.map((s, idx) => (
-                      <div key={idx} className="p-3 bg-[#0d1117] rounded-lg border border-[#30363d]">
-                        <span className="text-indigo-400 font-mono font-medium">
-                          Step {s.step}: {s.description}
-                        </span>
-                        <p className="text-gray-400 mt-1">{s.details}</p>
-                      </div>
-                    ))}
+                    {workflow.implementation_plan.implementation_plan?.map((s, idx) => {
+                      const desc = cleanDisplayText(s.description);
+                      const details = cleanDisplayText(s.details);
+                      return (
+                        <div key={idx} className="p-3.5 bg-[#0d1117] rounded-lg border border-[#30363d] space-y-1">
+                          <span className="text-indigo-400 font-semibold block text-xs">
+                            Step {s.step}: {desc}
+                          </span>
+                          {details && details !== desc && (
+                            <p className="text-gray-300 text-xs leading-relaxed">{details}</p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
+
+                {workflow.implementation_plan.edge_cases?.length > 0 && (
+                  <div className="p-4 bg-[#21262d] rounded-lg border border-[#30363d] space-y-2">
+                    <span className="font-semibold text-amber-400 block text-xs uppercase tracking-wider">
+                      Key Considerations & Edge Cases
+                    </span>
+                    <ul className="list-disc list-inside space-y-1 text-gray-300 text-xs leading-relaxed">
+                      {workflow.implementation_plan.edge_cases.map((ec, idx) => (
+                        <li key={idx}>{cleanDisplayText(ec)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </>
             ) : (
               <p className="text-gray-500">Plan not yet generated.</p>
@@ -502,23 +551,58 @@ export default function WorkflowView() {
           <div className="p-6 space-y-4 text-xs">
             {workflow?.explanation ? (
               <div className="space-y-4">
-                <div className="p-3 bg-[#21262d] rounded-lg border border-[#30363d]">
-                  <span className="font-semibold text-gray-200 block mb-1">Overview:</span>
-                  <p className="text-gray-300 leading-relaxed">{workflow.explanation.overview}</p>
+                <div className="p-4 bg-[#21262d] rounded-lg border border-[#30363d] space-y-1">
+                  <span className="font-semibold text-indigo-400 block text-xs uppercase tracking-wider">
+                    Program Overview
+                  </span>
+                  <p className="text-gray-300 leading-relaxed text-xs">
+                    {cleanDisplayText(workflow.explanation.overview)}
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <span className="font-semibold text-gray-200 block">Functions Breakdown:</span>
-                  {workflow.explanation.functions?.map((fn, idx) => (
-                    <div key={idx} className="p-3 bg-[#0d1117] rounded-lg border border-[#30363d] space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="font-mono text-indigo-400 font-semibold">{fn.name}()</span>
-                        {fn.complexity && <span className="text-gray-500 font-mono text-[11px]">{fn.complexity}</span>}
-                      </div>
-                      <p className="text-gray-400">{fn.explanation || fn.purpose}</p>
+                {workflow.explanation.functions?.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="font-semibold text-gray-400 block text-xs uppercase tracking-wider">
+                      Step-by-Step Logic & Functions Breakdown
+                    </span>
+                    <div className="space-y-2">
+                      {workflow.explanation.functions.map((fn, idx) => {
+                        const name = cleanDisplayText(fn.name);
+                        const isMethod = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name);
+                        const displayName = isMethod ? `${name}()` : name;
+                        const body = cleanDisplayText(fn.explanation || fn.purpose);
+                        return (
+                          <div key={idx} className="p-3.5 bg-[#0d1117] rounded-lg border border-[#30363d] space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-semibold text-indigo-400 text-xs">
+                                {displayName}
+                              </span>
+                              {fn.complexity && (
+                                <span className="text-gray-400 font-mono text-[11px] bg-[#21262d] px-2 py-0.5 rounded border border-[#30363d]">
+                                  {cleanDisplayText(fn.complexity)}
+                                </span>
+                              )}
+                            </div>
+                            {body && <p className="text-gray-300 text-xs leading-relaxed">{body}</p>}
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
+
+                {workflow.explanation.key_concepts?.length > 0 && (
+                  <div className="p-4 bg-[#21262d] rounded-lg border border-[#30363d] space-y-2">
+                    <span className="font-semibold text-emerald-400 block text-xs uppercase tracking-wider">
+                      Complexity & Key Concepts
+                    </span>
+                    <ul className="list-disc list-inside space-y-1 text-gray-300 text-xs leading-relaxed">
+                      {workflow.explanation.key_concepts.map((kc, idx) => (
+                        <li key={idx}>{cleanDisplayText(kc)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-gray-500">Explanation not yet formulated.</p>

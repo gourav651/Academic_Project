@@ -109,6 +109,53 @@ def test_explainer_agent():
         assert result["result"]["overview"] == "Division helper function"
     asyncio.run(_run())
 
+def test_planner_agent_plain_english():
+    async def _run():
+        service = OllamaService()
+        service.generate = AsyncMock(return_value="""PROBLEM UNDERSTANDING:
+Check if a given number equals the sum of its own digits raised to the power of digit count.
+
+IMPLEMENTATION STEPS:
+1. Extract Digits: Convert the number to a string to easily iterate over each digit.
+2. Sum Powers: Calculate each digit raised to power of digit length and sum them up.
+3. Compare: Return True if the calculated sum equals the original number, else False.
+
+KEY CONSIDERATIONS & EDGE CASES:
+- Single digit numbers are Armstrong numbers by definition.
+- Handle non-positive or negative integers gracefully.
+""")
+        agent = PlannerAgent(service)
+        result = await agent.execute("Write a Python function to check for Armstrong numbers")
+        assert result["success"] is True
+        assert "Check if a given number equals the sum" in result["plan"]["problem_understanding"]
+        assert len(result["plan"]["implementation_plan"]) == 3
+        assert result["plan"]["implementation_plan"][0]["description"] == "Extract Digits"
+        assert len(result["plan"]["edge_cases"]) >= 2
+    asyncio.run(_run())
+
+def test_explainer_agent_plain_english():
+    async def _run():
+        service = OllamaService()
+        service.generate = AsyncMock(return_value="""OVERVIEW:
+This algorithm determines whether a given integer is an Armstrong number.
+
+STEP-BY-STEP LOGIC:
+1. is_armstrong: Main function that extracts digits and computes the sum of powers.
+2. Verification: Compares the accumulated total against the original value.
+
+COMPLEXITY & KEY CONCEPTS:
+- Time Complexity: O(d) where d is the number of digits in the integer.
+- Space Complexity: O(1) auxiliary space.
+- Key Concepts: Digit manipulation and mathematical power computation.
+""")
+        agent = ExplainerAgent(service)
+        result = await agent.execute("def is_armstrong(n): ...")
+        assert result["success"] is True
+        assert "determines whether a given integer is an Armstrong number" in result["result"]["overview"]
+        assert len(result["result"]["functions"]) == 2
+        assert result["result"]["functions"][0]["name"] == "is_armstrong"
+    asyncio.run(_run())
+
 def test_routing_logic():
     # Route to debugger when error detected and attempts < max
     state_with_error = {"has_errors": True, "debugging_attempts": 1, "max_debug_attempts": 3}

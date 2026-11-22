@@ -37,6 +37,27 @@ def _merge(left, right):
     result.extend(right[j:])
     return result`;
 
+const cleanDisplayText = (val) => {
+  if (!val) return '';
+  if (typeof val !== 'string') return String(val);
+  let cleaned = val.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
+  }
+  if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+    try {
+      const obj = JSON.parse(cleaned);
+      if (obj.overview) return obj.overview;
+      if (obj.explanation) return obj.explanation;
+      if (obj.purpose) return obj.purpose;
+    } catch {}
+  }
+  cleaned = cleaned.replace(/^[{\s]*"(?:overview|explanation|purpose)"\s*:\s*"/i, '');
+  cleaned = cleaned.replace(/",\s*"[a-zA-Z0-9_]+"\s*:[\s\S]*$/, '');
+  cleaned = cleaned.replace(/["}\]]+$/, '').trim();
+  return cleaned;
+};
+
 export default function Explainer() {
   const { activeModel } = useApp();
   const [code, setCode] = useState(sampleExplainCode);
@@ -103,7 +124,7 @@ export default function Explainer() {
                   <Lightbulb className="w-4 h-4" />
                   <span>Program Overview</span>
                 </div>
-                <p className="text-xs text-gray-300 leading-relaxed">{explanation.overview}</p>
+                <p className="text-xs text-gray-300 leading-relaxed">{cleanDisplayText(explanation.overview)}</p>
               </div>
 
               {/* Execution Flow */}
@@ -113,34 +134,40 @@ export default function Explainer() {
                     <TrendingUp className="w-4 h-4" />
                     <span>Execution Flow</span>
                   </div>
-                  <p className="text-xs text-gray-300 leading-relaxed font-sans">{explanation.execution_flow}</p>
+                  <p className="text-xs text-gray-300 leading-relaxed font-sans">{cleanDisplayText(explanation.execution_flow)}</p>
                 </div>
               )}
 
               {/* Functions Breakdown */}
-              <div className="space-y-3">
-                <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider block">
-                  Functions Breakdown
-                </span>
-                {explanation.functions?.map((fn, idx) => (
-                  <div key={idx} className="p-4 bg-[#161b22] border border-[#30363d] rounded-xl space-y-2">
-                    <div className="flex justify-between items-center border-b border-[#30363d] pb-2">
-                      <span className="font-mono text-sm font-semibold text-indigo-400">{fn.name}()</span>
-                      {fn.complexity && (
-                        <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#21262d] text-gray-300 border border-[#30363d]">
-                          {fn.complexity}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-300">{fn.explanation || fn.purpose}</p>
-                    {fn.parameters && (
-                      <div className="text-[11px] text-gray-400">
-                        <span className="text-gray-500">Parameters:</span> {fn.parameters}
+              {explanation.functions?.length > 0 && (
+                <div className="space-y-3">
+                  <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider block">
+                    Functions Breakdown
+                  </span>
+                  {explanation.functions.map((fn, idx) => {
+                    const name = cleanDisplayText(fn.name);
+                    const displayName = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) ? `${name}()` : name;
+                    return (
+                      <div key={idx} className="p-4 bg-[#161b22] border border-[#30363d] rounded-xl space-y-2">
+                        <div className="flex justify-between items-center border-b border-[#30363d] pb-2">
+                          <span className="font-mono text-sm font-semibold text-indigo-400">{displayName}</span>
+                          {fn.complexity && (
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#21262d] text-gray-300 border border-[#30363d]">
+                              {cleanDisplayText(fn.complexity)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-300">{cleanDisplayText(fn.explanation || fn.purpose)}</p>
+                        {fn.parameters && (
+                          <div className="text-[11px] text-gray-400">
+                            <span className="text-gray-500">Parameters:</span> {cleanDisplayText(fn.parameters)}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-[#161b22] p-10 rounded-xl border border-[#30363d] text-center space-y-3">
