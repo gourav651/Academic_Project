@@ -5,9 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from datetime import datetime
+from sqlalchemy import update
 from app.core.config import settings
 from app.core.logging_config import logger
 from app.database.init_db import init_db
+from app.database.session import AsyncSessionLocal
+from app.database.models import WorkflowRun
 from app.api.routes import (
     health,
     models,
@@ -32,6 +36,21 @@ INDEX_HTML_PATH = os.path.join(FRONTEND_DIST, "index.html")
 async def lifespan(app: FastAPI):
     # Initialize SQLite tables on startup
     await init_db()
+    # Mark any previously interrupted runs as failed
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                update(WorkflowRun)
+                .where(WorkflowRun.workflow_status == "running")
+                .values(
+                    workflow_status="failed",
+                    error_message="Workflow execution interrupted by server restart. Please trigger a new run.",
+                    completed_at=datetime.utcnow()
+                )
+            )
+            await db.commit()
+    except Exception as e:
+        logger.warning(f"Could not clean up interrupted runs: {e}")
     logger.info("Autonomous Software Engineering Framework Database initialized.")
     yield
     logger.info("Application shutting down.")
