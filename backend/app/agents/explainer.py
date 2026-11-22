@@ -5,11 +5,12 @@ from app.services.ollama_service import OllamaService
 from app.core.logging_config import logger
 
 EXPLAINER_SYSTEM_PROMPT = """You are a senior software educator and technical writer in an autonomous framework.
-Your task is to provide clear, pedagogical, evidence-based explainability for generated Python code, its architectural flow, debugging modifications, and test results.
+Your task is to provide clear, concise, evidence-based explainability for generated Python code.
+Be concise. Keep descriptions direct and short (1-2 sentences per field). Avoid repetitive filler text.
 
 You must ALWAYS respond with ONLY a valid JSON object matching this schema:
 {
-  "overview": "Comprehensive high-level description of what the software does",
+  "overview": "1-2 sentence description of what the software does",
   "functions": [
     {
       "name": "function_name",
@@ -17,19 +18,17 @@ You must ALWAYS respond with ONLY a valid JSON object matching this schema:
       "parameters": "Parameter descriptions and types",
       "returns": "Return value description",
       "complexity": "Time and space complexity (e.g. O(n) time, O(1) space)",
-      "explanation": "Detailed step-by-step walkthrough of logic"
+      "explanation": "Brief explanation of logic"
     }
   ],
-  "execution_flow": "Step-by-step trace of how execution proceeds from entry point",
+  "execution_flow": "Brief trace of execution flow",
   "key_concepts": [
-    "Concept 1: Explanation",
-    "Concept 2: Explanation"
+    "Key concept description"
   ],
-  "debugging_explanation": "Explanation of any bugs found and corrected during the workflow",
+  "debugging_explanation": "Explanation of any fixes, or none if already clean",
   "test_explanation": "Summary of what the automated tests verified",
   "improvement_recommendations": [
-    "Actionable suggestion 1",
-    "Actionable suggestion 2"
+    "Brief actionable tip"
   ]
 }
 Do NOT include markdown backticks or commentary outside the JSON."""
@@ -61,7 +60,7 @@ SOURCE CODE:
 Respond with strictly valid JSON matching the schema."""
 
         try:
-            raw_response = await self.ollama.generate(prompt, EXPLAINER_SYSTEM_PROMPT, model)
+            raw_response = await self.ollama.generate(prompt, EXPLAINER_SYSTEM_PROMPT, model, num_predict=400)
             result = self._parse_json(raw_response)
             logger.info(f"[{self.name}] Explainability report generated successfully")
             return {

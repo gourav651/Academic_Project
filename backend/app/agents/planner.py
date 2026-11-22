@@ -5,21 +5,22 @@ from app.services.ollama_service import OllamaService
 from app.core.logging_config import logger
 
 PLANNER_SYSTEM_PROMPT = """You are an expert software engineering planner in an autonomous software development framework.
-Your task is to analyze natural language programming requirements, break them down into functional specifications, identify constraints and edge cases, and produce a structured, actionable implementation plan.
+Your task is to analyze programming requirements and quickly produce a clear, concise implementation plan.
+Keep descriptions short and direct (1-2 sentences each). Do not write lengthy essays.
 
 You must ALWAYS respond with ONLY a valid JSON object matching this exact schema:
 {
-  "problem_understanding": "Clear summary of the programming goal",
+  "problem_understanding": "Clear 1-sentence summary of the goal",
   "functional_requirements": ["Requirement 1", "Requirement 2"],
-  "technical_constraints": ["Constraint 1", "Constraint 2"],
+  "technical_constraints": ["Constraint 1"],
   "implementation_plan": [
-    {"step": 1, "description": "Step title", "details": "Specific implementation steps"}
+    {"step": 1, "description": "Step title", "details": "Brief implementation details"}
   ],
   "required_functions": [
-    {"name": "function_name", "purpose": "What it does", "inputs": "parameter list", "outputs": "return type/description"}
+    {"name": "function_name", "purpose": "What it does", "inputs": "parameter list", "outputs": "return type"}
   ],
   "expected_behavior": "Expected behavior on standard inputs",
-  "edge_cases": ["Edge case 1 (e.g. empty inputs, boundary values)", "Edge case 2"],
+  "edge_cases": ["Edge case 1", "Edge case 2"],
   "estimated_complexity": "low|medium|high"
 }
 Do NOT include markdown backticks or commentary outside the JSON."""
@@ -39,7 +40,7 @@ REQUIREMENT:
 Respond with strictly valid JSON matching the schema."""
 
         try:
-            raw_response = await self.ollama.generate(prompt, PLANNER_SYSTEM_PROMPT, model)
+            raw_response = await self.ollama.generate(prompt, PLANNER_SYSTEM_PROMPT, model, num_predict=350)
             plan = self._parse_json(raw_response)
             logger.info(f"[{self.name}] Plan generated with {len(plan.get('implementation_plan', []))} steps")
             return {

@@ -7,10 +7,11 @@ from app.core.logging_config import logger
 
 REVIEWER_SYSTEM_PROMPT = """You are a senior software architect and code reviewer in an autonomous framework.
 Your task is to review Python code for correctness, security vulnerabilities, edge cases, readability, and maintainability.
+Be concise. Keep review summary to 1-2 sentences. If code has no major issues, return an empty findings list or 1-2 key items. Keep recommendations short.
 
 You must ALWAYS respond with ONLY a valid JSON object matching this schema:
 {
-  "review_summary": "High-level summary of code quality and readiness",
+  "review_summary": "1-2 sentence summary of code quality",
   "overall_quality": "poor|fair|good|excellent",
   "findings": [
     {
@@ -25,8 +26,8 @@ You must ALWAYS respond with ONLY a valid JSON object matching this schema:
   "security_concerns": ["Security concern if any"],
   "maintainability_score": 8,
   "readability_score": 9,
-  "recommendations": ["Recommendation 1", "Recommendation 2"],
-  "suggested_improvements": "Detailed code improvements"
+  "recommendations": ["Key recommendation"],
+  "suggested_improvements": "Brief improvement tip"
 }
 Do NOT include markdown backticks or commentary outside the JSON."""
 
@@ -58,7 +59,7 @@ CODE TO REVIEW:
 Perform thorough semantic review. Respond with strictly valid JSON matching the schema."""
 
         try:
-            raw_response = await self.ollama.generate(prompt, REVIEWER_SYSTEM_PROMPT, model)
+            raw_response = await self.ollama.generate(prompt, REVIEWER_SYSTEM_PROMPT, model, num_predict=450)
             ai_review = self._parse_json(raw_response)
             
             # Combine deterministic findings and AI suggestions, maintaining attribution

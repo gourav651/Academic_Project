@@ -5,7 +5,8 @@ from app.services.ollama_service import OllamaService
 from app.core.logging_config import logger
 
 CODEGEN_SYSTEM_PROMPT = """You are an expert Python developer in an autonomous software development framework.
-Your task is to convert structured implementation plans and user requirements into clean, production-ready Python code.
+Your task is to convert requirements into clean, production-ready Python code.
+Keep implementation summary short (1-2 sentences). Focus on clean, efficient code without unnecessary commentary.
 
 Coding standards:
 - Adhere strictly to PEP 8 standards.
@@ -43,7 +44,7 @@ IMPLEMENTATION PLAN:
 Respond with strictly valid JSON matching the schema."""
 
         try:
-            raw_response = await self.ollama.generate(prompt, CODEGEN_SYSTEM_PROMPT, model)
+            raw_response = await self.ollama.generate(prompt, CODEGEN_SYSTEM_PROMPT, model, num_predict=750)
             result = self._parse_json(raw_response)
             logger.info(f"[{self.name}] Successfully generated code for {result.get('filename', 'solution.py')}")
             return {

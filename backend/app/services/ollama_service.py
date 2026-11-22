@@ -40,13 +40,29 @@ class OllamaService:
                 "error": f"Cannot connect to Ollama at {self.base_url}. Ensure Ollama is installed and running (`ollama serve`). Details: {str(e)}"
             }
 
-    async def generate(self, prompt: str, system: str = "", model: Optional[str] = None) -> str:
-        """Execute chat completion with Ollama with timeout and error handling."""
+    async def generate(
+        self, 
+        prompt: str, 
+        system: str = "", 
+        model: Optional[str] = None,
+        num_predict: int = 768,
+        temperature: float = 0.1
+    ) -> str:
+        """Execute chat completion with Ollama with timeout, fast sampling options, and error handling."""
         model_to_use = model or self.model
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
+
+        opts = {
+            "temperature": temperature,
+            "num_predict": num_predict,
+            "num_ctx": 2048,
+            "top_k": 20,
+            "top_p": 0.8,
+            "repeat_penalty": 1.15
+        }
 
         try:
             loop = asyncio.get_running_loop()
@@ -55,7 +71,7 @@ class OllamaService:
                 return self.client.chat(
                     model=model_to_use,
                     messages=messages,
-                    options={"temperature": 0.2, "num_predict": 4096}
+                    options=opts
                 )
 
             response = await asyncio.wait_for(

@@ -17,11 +17,15 @@ class TestingService:
             if clean_source.startswith("```"):
                 clean_source = re.sub(r"^```[a-zA-Z]*\n?", "", clean_source)
                 clean_source = re.sub(r"\n?```$", "", clean_source).strip()
+            if "\\n" in clean_source and "\n" not in clean_source:
+                clean_source = clean_source.replace("\\n", "\n").replace("\\t", "    ").replace('\\"', '"')
 
             clean_test = test_code.strip()
             if clean_test.startswith("```"):
                 clean_test = re.sub(r"^```[a-zA-Z]*\n?", "", clean_test)
                 clean_test = re.sub(r"\n?```$", "", clean_test).strip()
+            if "\\n" in clean_test and "\n" not in clean_test:
+                clean_test = clean_test.replace("\\n", "\n").replace("\\t", "    ").replace('\\"', '"')
 
             # 1. Write solution.py
             with open(os.path.join(tmp_dir, "solution.py"), 'w', encoding='utf-8') as f:

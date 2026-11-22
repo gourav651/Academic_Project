@@ -73,7 +73,7 @@ ATTEMPT NUMBER: {attempt} of {self.max_attempts}
 Identify the root cause and provide the FULL corrected code. Respond with strictly valid JSON matching the schema."""
 
         try:
-            raw_response = await self.ollama.generate(prompt, DEBUGGER_SYSTEM_PROMPT, model)
+            raw_response = await self.ollama.generate(prompt, DEBUGGER_SYSTEM_PROMPT, model, num_predict=750)
             result = self._parse_json(raw_response)
             
             # Deterministic AST validation on proposed correction

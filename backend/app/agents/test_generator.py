@@ -5,15 +5,12 @@ from app.services.ollama_service import OllamaService
 from app.core.logging_config import logger
 
 TESTGEN_SYSTEM_PROMPT = """You are a senior test engineer specializing in Pytest.
-Your task is to generate comprehensive, robust unit tests for the provided Python source code.
+Your task is to generate clean, robust unit tests for the provided Python source code.
+Generate 2-3 focused test functions covering normal, edge, and invalid inputs. Keep descriptions brief.
 
 Test writing requirements:
 - Import all functions directly from `solution` (e.g. `from solution import *` or explicit function names).
-- Cover 3 categories:
-  1. "normal": Expected valid inputs and typical workflows.
-  2. "edge": Boundary conditions, zeros, empty strings, empty lists, large numbers.
-  3. "invalid": Incorrect types, negative numbers where disallowed, handling exceptions using `pytest.raises(...)`.
-- Include clear docstrings for every test function.
+- Write strictly 2 to 3 test functions (e.g. test_normal, test_edge, test_invalid) with 1-2 distinct assertions each. Do NOT loop or repeat assertions.
 - Do NOT mock internal logic unnecessarily unless dealing with I/O or external systems.
 
 You must ALWAYS respond with ONLY a valid JSON object matching this schema:
@@ -26,8 +23,8 @@ You must ALWAYS respond with ONLY a valid JSON object matching this schema:
       "category": "normal|edge|invalid"
     }
   ],
-  "coverage_areas": ["function_name_1", "function_name_2"],
-  "test_strategy": "Explanation of testing approach"
+  "coverage_areas": ["function_name"],
+  "test_strategy": "Brief testing strategy"
 }
 Do NOT include markdown backticks or commentary outside the JSON."""
 
@@ -49,7 +46,7 @@ SOURCE CODE:
 Respond with strictly valid JSON matching the schema."""
 
         try:
-            raw_response = await self.ollama.generate(prompt, TESTGEN_SYSTEM_PROMPT, model)
+            raw_response = await self.ollama.generate(prompt, TESTGEN_SYSTEM_PROMPT, model, num_predict=600)
             result = self._parse_json(raw_response)
             logger.info(f"[{self.name}] Generated {len(result.get('test_cases', []))} test cases")
             return {
@@ -107,6 +104,8 @@ Respond with strictly valid JSON matching the schema."""
 
         code = re.sub(r"^```[a-zA-Z]*\n?", "", code.strip())
         code = re.sub(r"\n?```$", "", code.strip())
+        if "\\n" in code and "\n" not in code:
+            code = code.replace("\\n", "\n").replace("\\t", "    ").replace('\\"', '"')
 
         return {
             "test_code": code,
